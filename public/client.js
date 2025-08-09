@@ -92,5 +92,13 @@
     toggleMini.onclick=()=> miniWrap.classList.toggle('hide');
     toggleLeader.onclick=()=> leaderWrap.classList.toggle('hide');
     toggleChat.onclick=()=> chatWrap.classList.toggle('hide');
+    chatInput.addEventListener('keydown',e=>{
+      e.stopPropagation();
+      if(e.key==='Enter'){
+        const text=chatInput.value.trim();
+        if(text&&connected){ ws?.send(JSON.stringify({type:'chat', text})); }
+        chatInput.value='';
+      }
+    });
     loadSetup();
     showLogin();
