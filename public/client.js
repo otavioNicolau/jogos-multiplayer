@@ -3,7 +3,9 @@
     const screenSetup=$('screen-setup'), screenGame=$('screen-game');
     const wsUrlEl=$('wsurl'), roomEl=$('room'), nameEl=$('playername'), zoomSel=$('zoom');
     const btnConnect=$('btnConnect'), btnStart=$('btnStart');
-    const cvs=$('c'), ctx=cvs?cvs.getContext('2d'):null; const mini=$('mini'), mtx=mini?mini.getContext('2d'):null;
+    const cvs=$('c'), ctx=cvs?cvs.getContext('2d'):null;
+    const miniCanvas=$('mini');
+    const miniMap=miniCanvas?new MiniMap(miniCanvas):null;
     const scoreEl=$('score'), pcountEl=$('pcount'), pingEl=$('ping'), worldEl=$('world'), roomLabel=$('roomLabel');
     const leaderEl=$('leader'), chatlog=$('chatlog'), chatInput=$('chatmsg');
     const pause=$('pause'), resumeBtn=$('resume'), backBtn=$('backToSetup');
@@ -25,8 +27,7 @@
     function drawFruit(x,y,id){ if(!ctx) return; const spr=sprites.fruits[fruitTypeFromId(id||'apple')]||sprites.fruits.apple; const {px,py}=worldToScreen(x,y); ctx.drawImage(spr, Math.round(px+1), Math.round(py+1), CELL-2, CELL-2); }
     function drawDrop(x,y,value){ if(!ctx) return; const {px,py}=worldToScreen(x,y); ctx.drawImage(sprites.coin, Math.round(px+1), Math.round(py+1), CELL-2, CELL-2); ctx.fillStyle='#fff'; ctx.font='10px system-ui,Arial'; ctx.fillText(String(value), Math.round(px)+6, Math.round(py)+CELL-4); }
     function drawSnake(p){ if(!ctx) return; p.body.forEach((seg,i)=>{ const {px,py}=worldToScreen(seg.x,seg.y); ctx.fillStyle=i===0?'#ffffff':p.color; ctx.fillRect(Math.round(px),Math.round(py),CELL-1,CELL-1); }); const head=p.body[0]; if(head){ const {px,py}=worldToScreen(head.x,head.y); const label=p.name||''; const w=ctx.measureText(label).width+8; ctx.fillStyle='rgba(0,0,0,.35)'; ctx.fillRect(Math.round(px)-2, Math.round(py)-16, w, 12); ctx.fillStyle='#fff'; ctx.font='12px system-ui,Arial'; ctx.fillText(label, Math.round(px)+2, Math.round(py)-6); } }
-    function render(){ if(!ctx||!mtx) return; ctx.fillStyle='#0f0f17'; ctx.fillRect(0,0,cvs.width,cvs.height); drawGround(); apples.forEach(a=> drawFruit(a.x,a.y,a.id)); drops.forEach(d=> drawDrop(d.x,d.y,d.value)); Object.values(players).forEach(drawSnake); drawMini(); }
-    function drawMini(){ if(!mtx) return; const mW=mini.width, mH=mini.height; mtx.clearRect(0,0,mW,mH); const sx=mW/WORLD.w, sy=mH/WORLD.h; mtx.globalAlpha=.18; mtx.fillStyle='#7f8cff'; for(let y=0;y<WORLD.h;y+=4){ for(let x=0;x<WORLD.w;x+=4){ if(hash32(x,y)>0.75) mtx.fillRect(Math.floor(x*sx),Math.floor(y*sy),Math.ceil(2*sx),Math.ceil(2*sy)); }} mtx.globalAlpha=1; mtx.fillStyle='#ffcc00'; apples.forEach(a=> mtx.fillRect(a.x*sx,a.y*sy, Math.max(1,sx), Math.max(1,sy))); mtx.fillStyle='#ff9f1a'; drops.forEach(d=> mtx.fillRect(d.x*sx,d.y*sy, Math.max(1,sx), Math.max(1,sy))); Object.entries(players).forEach(([id,p])=>{ mtx.fillStyle=id===myId?'#ffffff':'#7c5cff'; mtx.fillRect(p.x*sx,p.y*sy, Math.max(1,sx+0.5), Math.max(1,sy+0.5)); }); }
+    function render(){ if(!ctx) return; ctx.fillStyle='#0f0f17'; ctx.fillRect(0,0,cvs.width,cvs.height); drawGround(); apples.forEach(a=> drawFruit(a.x,a.y,a.id)); drops.forEach(d=> drawDrop(d.x,d.y,d.value)); Object.values(players).forEach(drawSnake); miniMap?.render(WORLD, players, apples, drops, myId); }
     function loop(){ requestAnimationFrame(loop); render(); } requestAnimationFrame(loop);
     let lastDir={x:1,y:0}, lastSend=0;
     function sendDir(nx,ny){ if(!connected) return; const now=performance.now(); if(now-lastSend<40) return; if(lastDir&&nx===-lastDir.x&&ny===-lastDir.y) return; lastDir={x:nx,y:ny}; lastSend=now; ws.send(JSON.stringify({type:'dir', x:nx, y:ny})); }
@@ -38,7 +39,7 @@
     function renderLeader(){ leaderEl.innerHTML=''; leaderboard.slice(0,10).forEach(it=>{ const li=document.createElement('li'); li.textContent=`${it.name} — ${it.score}`; leaderEl.appendChild(li); }); }
     function pushChat(t){ const d=document.createElement('div'); d.textContent=t; chatlog.appendChild(d); chatlog.scrollTop=chatlog.scrollHeight; }
     function ping(){ if(!connected) return; ws.send(JSON.stringify({type:'ping', t: performance.now()})); setTimeout(ping,1000); }
-    function resizeToViewport(){ const w=innerWidth, h=innerHeight; if(cvs){ cvs.width=w; cvs.height=h; } if(mini){ mini.width=220; mini.height=220; } }
+    function resizeToViewport(){ const w=innerWidth, h=innerHeight; if(cvs){ cvs.width=w; cvs.height=h; } if(miniCanvas){ miniCanvas.width=220; miniCanvas.height=220; } }
     addEventListener('resize', resizeToViewport);
     function showGame(){ screenSetup.style.display='none'; screenGame.style.display='block'; resizeToViewport(); }
     function showSetup(){ screenSetup.style.display='grid'; screenGame.style.display='none'; }
