@@ -14,6 +14,12 @@ const MAX_NAME = 18;
 const MAX_PLAYERS = 50;
 
 const server = http.createServer((req, res) => {
+  if (req.url === '/rank') {
+    const list = getGlobalRank();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(list));
+    return;
+  }
   const urlPath = req.url === '/' ? '/index.html' : req.url;
   const safePath = path.normalize(urlPath).replace(/^(\.\.[\/\\])+/, '');
   const filePath = path.join(__dirname, 'public', safePath);
@@ -36,6 +42,21 @@ server.listen(PORT, () => console.log(`HTTP/WebSocket server on http://localhost
 // rooms: Map<roomId, {id, auto, tick, players, apples, drops, world}>
 const rooms = new Map();
 let autoRoomCounter = 1;
+const globalRank = new Map();
+
+function updateGlobalRank(room) {
+  room.players.forEach(p => {
+    const prev = globalRank.get(p.name) || 0;
+    if (p.score > prev) globalRank.set(p.name, p.score);
+  });
+}
+
+function getGlobalRank() {
+  return [...globalRank.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 20)
+    .map(([name, score]) => ({ name, score }));
+}
 function createRoom(id, auto = false) {
   const room = { id, auto, tick: 0, players: new Map(), apples: [], drops: [], world: { ...WORLD } };
   rooms.set(id, room);
@@ -169,6 +190,7 @@ setInterval(() => {
     });
 
     room.tick++;
+    updateGlobalRank(room);
     broadcastRoom(room, fullState(room));
   });
 }, TICK_MS);
