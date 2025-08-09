@@ -111,7 +111,7 @@ function newPlayer(room, ws, name){
     id, ws, name: clampName(name), color: randColor(),
     x: head.x, y: head.y, dir: { x: 1, y: 0 },
     body: [head, {x: wrap(head.x-1, room.world.w), y: head.y}, {x: wrap(head.x-2, room.world.w), y: head.y}],
-    score: 0, alive: true, running: false, lastDirAt: 0
+    score: 0, alive: true, running: false, lastDirAt: 0, speed: 1
   };
   room.players.set(id, p);
   return p;
@@ -150,42 +150,46 @@ setInterval(() => {
     // 1) mover todos
     room.players.forEach(p => {
       if(!p.running || !p.alive) return;
-      const nx = wrap(p.x + p.dir.x, world.w);
-      const ny = wrap(p.y + p.dir.y, world.h);
-      const head = { x: nx, y: ny };
+      const steps = p.speed || 1;
+      for(let step=0; step<steps && p.alive; step++){
+        const nx = wrap(p.x + p.dir.x, world.w);
+        const ny = wrap(p.y + p.dir.y, world.h);
+        const head = { x: nx, y: ny };
 
-      // colisão com si mesmo?
-      if (p.body.some(s => s.x===head.x && s.y===head.y)) {
-        killWithDrop(room, p, head);
-        return;
-      }
-      // colisão com outras cobras?
-      for (const q of room.players.values()) {
-        if (q.id === p.id) continue;
-        if (q.body.some(s => s.x===head.x && s.y===head.y)) {
+        // colisão com si mesmo?
+        if (p.body.some(s => s.x===head.x && s.y===head.y)) {
           killWithDrop(room, p, head);
-          return;
+          break;
         }
-      }
+        // colisão com outras cobras?
+        for (const q of room.players.values()) {
+          if (q.id === p.id) continue;
+          if (q.body.some(s => s.x===head.x && s.y===head.y)) {
+            killWithDrop(room, p, head);
+            break;
+          }
+        }
+        if(!p.alive) break;
 
-      // andar
-      p.body.unshift(head); p.x = head.x; p.y = head.y;
+        // andar
+        p.body.unshift(head); p.x = head.x; p.y = head.y;
 
-      // 2) maçã?
-      const hitApple = room.apples.findIndex(a => a.x===head.x && a.y===head.y);
-      if (hitApple >= 0) {
-        room.apples.splice(hitApple, 1);
-        p.score += 10;
-        ensureApples(room);
-      } else {
-        p.body.pop();
-      }
+        // 2) maçã?
+        const hitApple = room.apples.findIndex(a => a.x===head.x && a.y===head.y);
+        if (hitApple >= 0) {
+          room.apples.splice(hitApple, 1);
+          p.score += 10;
+          ensureApples(room);
+        } else {
+          p.body.pop();
+        }
 
-      // 3) coletar drop de pontos?
-      const hitDrop = room.drops.findIndex(d => d.x===head.x && d.y===head.y);
-      if (hitDrop >= 0) {
-        p.score += room.drops[hitDrop].value;
-        room.drops.splice(hitDrop, 1);
+        // 3) coletar drop de pontos?
+        const hitDrop = room.drops.findIndex(d => d.x===head.x && d.y===head.y);
+        if (hitDrop >= 0) {
+          p.score += room.drops[hitDrop].value;
+          room.drops.splice(hitDrop, 1);
+        }
       }
     });
 
@@ -221,6 +225,9 @@ wss.on('connection', (ws) => {
       const cur = me.dir;
       if (me.body.length > 1 && (x === -cur.x && y === -cur.y)) return;
       me.dir = { x, y };
+    }
+    else if (msg.type === 'speed') {
+      me.speed = msg.fast ? 2 : 1;
     }
     else if (msg.type === 'start') { me.running = true; me.alive = true; }
     else if (msg.type === 'pause') { me.running = false; }
