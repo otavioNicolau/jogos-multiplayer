@@ -20,3 +20,7 @@ Opcionalmente, defina a porta via variável de ambiente `PORT` antes de iniciar:
 ```bash
 PORT=3000 npm start
 ```
+
+## Novidades
+- Mapa expandido para 160x120 células.
+- Sistema de salas automático que agrupa até 50 jogadores por sala. Deixe o campo **Sala** vazio para entrar automaticamente.

@@ -8,9 +8,10 @@ const path = require('path');
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 8080;
 const TICK_MS = 110;
-const WORLD = { w: 80, h: 60 };
+const WORLD = { w: 160, h: 120 };
 const BASE_APPLES = 4;
 const MAX_NAME = 18;
+const MAX_PLAYERS = 50;
 
 const server = http.createServer((req, res) => {
   const urlPath = req.url === '/' ? '/index.html' : req.url;
@@ -32,14 +33,23 @@ const server = http.createServer((req, res) => {
 const wss = new WebSocketServer({ server });
 server.listen(PORT, () => console.log(`HTTP/WebSocket server on http://localhost:${PORT}`));
 
-// rooms[roomId] = { tick, players: Map, apples: [], drops: [], world }
+// rooms: Map<roomId, {id, auto, tick, players, apples, drops, world}>
 const rooms = new Map();
+let autoRoomCounter = 1;
+function createRoom(id, auto = false) {
+  const room = { id, auto, tick: 0, players: new Map(), apples: [], drops: [], world: { ...WORLD } };
+  rooms.set(id, room);
+  return room;
+}
 function getRoom(roomId) {
   const id = (roomId || 'public').toLowerCase().slice(0, 24);
-  if (!rooms.has(id)) {
-    rooms.set(id, { tick: 0, players: new Map(), apples: [], drops: [], world: { ...WORLD } });
+  return rooms.get(id) || createRoom(id);
+}
+function getAutoRoom() {
+  for (const room of rooms.values()) {
+    if (room.auto && room.players.size < MAX_PLAYERS) return room;
   }
-  return rooms.get(id);
+  return createRoom(`room${autoRoomCounter++}`, true);
 }
 
 function rand(n){ return Math.floor(Math.random()*n); }
@@ -171,11 +181,12 @@ wss.on('connection', (ws) => {
     let msg; try { msg = JSON.parse(buf.toString()); } catch { return; }
 
     if (msg.type === 'hello') {
-      room = getRoom(msg.room);
+      room = msg.room ? getRoom(msg.room) : getAutoRoom();
+      if (room.players.size >= MAX_PLAYERS) room = getAutoRoom();
       me = newPlayer(room, ws, msg.name);
       ensureApples(room);
-      send(ws, { type:'init', id: me.id, world: room.world, apples: room.apples, drops: room.drops, players: serializePlayers(room.players), leader: leader(room.players), tick: room.tick });
-      broadcastRoom(room, { type:'msg', text: `${me.name} entrou na sala ${msg.room || 'public'}.` });
+      send(ws, { type:'init', id: me.id, room: room.id, world: room.world, apples: room.apples, drops: room.drops, players: serializePlayers(room.players), leader: leader(room.players), tick: room.tick });
+      broadcastRoom(room, { type:'msg', text: `${me.name} entrou na sala ${room.id}.` });
       return;
     }
     if (!room || !me) return;
@@ -197,7 +208,7 @@ wss.on('connection', (ws) => {
       room.players.delete(me.id);
       me = newPlayer(room, ws, nm);
       ensureApples(room);
-      send(ws, { type:'init', id: me.id, world: room.world, apples: room.apples, drops: room.drops, players: serializePlayers(room.players), leader: leader(room.players), tick: room.tick });
+      send(ws, { type:'init', id: me.id, room: room.id, world: room.world, apples: room.apples, drops: room.drops, players: serializePlayers(room.players), leader: leader(room.players), tick: room.tick });
     }
     else if (msg.type === 'ping') { send(ws, { type:'pong', t: msg.t }); }
     else if (msg.type === 'chat') {
