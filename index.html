@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Snake — PRO Multiplayer</title>
+  <style>
+    :root{ --ink:#e8ecff; --muted:#aab3ff; --accent:#7c5cff; }
+    html,body{height:100%;margin:0}
+    body{background:#0b1020;color:var(--ink);font-family:system-ui,Arial}
+    #screen-setup{position:fixed;inset:0;display:grid;place-items:center;background:radial-gradient(1200px 600px at 50% -10%, #1a2045 0%, #0b1020 60%);} 
+    .setup-card{width:min(900px,92vw);padding:24px;border:1px solid #2f3568;border-radius:16px;background:rgba(18,21,52,.55);backdrop-filter: blur(6px);} 
+    .setup-title{display:flex;align-items:center;gap:10px;font-size:28px;font-weight:800;margin:0 0 16px}
+    .setup-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+    .setup-grid .full{grid-column:1/-1}
+    .setup-grid label{font-size:12px;color:var(--muted)}
+    .setup-grid input,.setup-grid select,.setup-grid button{background:#1b1f3a;color:#fff;border:1px solid #2f3568;border-radius:12px;padding:10px 12px;font-weight:600}
+    .setup-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:10px}
+    .hint{color:#9bb;font-size:12px;margin-top:6px}
+    #screen-game{position:fixed;inset:0;display:none;background:#0b1020}
+    #game{position:absolute;inset:0}
+    #game canvas{position:absolute;inset:0;width:100vw;height:100vh;display:block;background:#0f0f17}
+    .overlay{position:absolute;z-index:10;color:var(--ink);font-size:12px}
+    .hud-top{top:8px;left:12px;right:12px;display:flex;gap:8px;align-items:center;pointer-events:none}
+    .pill{padding:6px 10px;border-radius:999px;background:rgba(20,24,55,.35);backdrop-filter: blur(4px);border:1px solid rgba(127,140,255,.25); pointer-events:auto}
+    .mini{top:12px;right:12px;width:220px;height:220px;border-radius:12px;border:1px dashed rgba(127,140,255,.35);overflow:hidden;}
+    .mini canvas{width:100%;height:100%;background:transparent}
+    .leader{right:12px;bottom:120px;max-width:250px}
+    .leader h3{margin:0 0 4px 0;font-size:12px;color:#cfe}
+    .leader ol{margin:0;padding-left:16px;line-height:1.5}
+    .chat{left:12px;bottom:12px;width:min(420px,50vw)}
+    .chatlog{height:110px;overflow:auto;border:1px dashed rgba(127,140,255,.35);border-radius:10px;padding:6px;background:transparent}
+    .chatlog div{color:#d6d9ff;margin:2px 0}
+    .chat input{width:100%;margin-top:6px;background:rgba(20,24,55,.35);border:1px solid rgba(127,140,255,.25);border-radius:10px;padding:8px 10px;color:#fff}
+    .toggles{position:absolute;top:12px;left:12px;z-index:11;display:flex;gap:6px}
+    .toggles button{background:rgba(20,24,55,.35);backdrop-filter:blur(4px);border:1px solid rgba(127,140,255,.25);color:#fff;border-radius:10px;padding:6px 10px;font-weight:700}
+    .dpad{position:absolute;right:12px;bottom:12px;z-index:11;display:grid;grid-template-columns:40px 40px 40px;gap:8px;opacity:.7}
+    .dpad button{background:rgba(20,24,55,.35);border:1px solid rgba(127,140,255,.25);color:#fff;border-radius:10px;padding:8px}
+    .dpad .ghost{visibility:hidden}
+    #pause{position:absolute;inset:0;display:none;place-items:center;background:rgba(0,0,0,.25);backdrop-filter: blur(2px)}
+    #pause .box{background:rgba(18,21,52,.8);border:1px solid #2f3568;border-radius:14px;padding:16px;display:grid;gap:8px}
+    #pause button{background:#1b1f3a;color:#fff;border:1px solid #2f3568;border-radius:12px;padding:10px 12px;font-weight:700}
+    .hide{display:none!important}
+  </style>
+</head>
+<body>
+  <section id="screen-setup" aria-label="Configuração">
+    <div class="setup-card">
+      <h1 class="setup-title">🐍 Snake — PRO Multiplayer</h1>
+      <div class="setup-grid">
+        <div>
+          <label>Servidor WS</label>
+          <input id="wsurl" value="ws://localhost:8080" />
+        </div>
+        <div>
+          <label>Sala (room)</label>
+          <input id="room" value="public" />
+        </div>
+        <div>
+          <label>Seu nome</label>
+          <input id="playername" placeholder="Jogador" />
+        </div>
+        <div>
+          <label>Zoom</label>
+          <select id="zoom">
+            <option value="20">Compacto</option>
+            <option value="24" selected>Padrão</option>
+            <option value="28">1.2x</option>
+            <option value="32">Grande</option>
+          </select>
+        </div>
+        <div class="full hint">Dica: você pode reabrir esta tela a qualquer momento com <b>Esc</b>.</div>
+      </div>
+      <div class="setup-actions">
+        <button id="btnConnect">Conectar</button>
+        <button id="btnStart" disabled>Entrar no jogo</button>
+      </div>
+    </div>
+  </section>
+  <section id="screen-game" aria-label="Jogo">
+    <div id="game">
+      <canvas id="c" aria-label="tabuleiro"></canvas>
+      <div class="toggles">
+        <button id="toggleMini" title="Mini‑mapa (M)">Mini</button>
+        <button id="toggleLeader" title="Leaderboard (L)">Rank</button>
+        <button id="toggleChat" title="Chat (C)">Chat</button>
+      </div>
+      <div class="overlay hud-top" id="hud">
+        <span class="pill">Pontos: <b id="score">0</b></span>
+        <span class="pill">Jogadores: <b id="pcount">0</b></span>
+        <span class="pill">Ping: <b id="ping">--</b> ms</span>
+        <span class="pill">Mundo: <b id="world">--</b></span>
+        <span class="pill">Sala: <b id="roomLabel">public</b></span>
+      </div>
+      <div class="overlay mini" id="miniWrap"><canvas id="mini"></canvas></div>
+      <div class="overlay leader" id="leaderWrap">
+        <h3>🏆 Leaderboard</h3>
+        <ol id="leader"></ol>
+      </div>
+      <div class="overlay chat" id="chatWrap">
+        <div class="chatlog" id="chatlog"></div>
+        <input id="chatmsg" placeholder="Escreva e Enter…" />
+      </div>
+      <div class="dpad" id="dpad">
+        <button data-dir="up">⬆️</button>
+        <div class="ghost"></div>
+        <button data-dir="right">➡️</button>
+        <button data-dir="left">⬅️</button>
+        <div class="ghost"></div>
+        <button data-dir="down">⬇️</button>
+      </div>
+      <div id="pause" class="hide">
+        <div class="box">
+          <b>Jogo pausado</b>
+          <button id="resume">Retomar (Esc)</button>
+          <button id="backToSetup">Voltar ao Lobby</button>
+          <button id="disconnect">Desconectar</button>
+        </div>
+      </div>
+    </div>
+  </section>
+  <script>
+    function hash32(x, y){ let h=(x*374761393 + y*668265263)|0; h^=h<<13; h^=h>>>17; h^=h<<5; return (h>>>0)/4294967296; }
+    function $(id){ return document.getElementById(id); }
+    const screenSetup=$('screen-setup'), screenGame=$('screen-game');
+    const wsUrlEl=$('wsurl'), roomEl=$('room'), nameEl=$('playername'), zoomSel=$('zoom');
+    const btnConnect=$('btnConnect'), btnStart=$('btnStart');
+    const cvs=$('c'), ctx=cvs?cvs.getContext('2d'):null; const mini=$('mini'), mtx=mini?mini.getContext('2d'):null;
+    const scoreEl=$('score'), pcountEl=$('pcount'), pingEl=$('ping'), worldEl=$('world'), roomLabel=$('roomLabel');
+    const leaderEl=$('leader'), chatlog=$('chatlog'), chatInput=$('chatmsg');
+    const pause=$('pause'), resumeBtn=$('resume'), backBtn=$('backToSetup');
+    const toggleMini=$('toggleMini'), toggleLeader=$('toggleLeader'), toggleChat=$('toggleChat');
+    const miniWrap=$('miniWrap'), leaderWrap=$('leaderWrap'), chatWrap=$('chatWrap');
+    const dpad=$('dpad');
+    let ws, connected=false, running=false, myId=null; let CELL=Number(zoomSel.value);
+    let WORLD={w:60,h:60}; let players={}, apples=[], leaderboard=[], drops=[]; let lastServerTick=0;
+    const LS_KEY='snake_pro_setup';
+    function loadSetup(){ try{ const s=JSON.parse(localStorage.getItem(LS_KEY)||'{}'); if(s.wsurl) wsUrlEl.value=s.wsurl; if(s.room) roomEl.value=s.room; if(s.name) nameEl.value=s.name; if(s.zoom){ zoomSel.value=String(s.zoom); CELL=Number(s.zoom);} }catch{} }
+    function saveSetup(){ const s={ wsurl:wsUrlEl.value, room:roomEl.value, name:nameEl.value, zoom:Number(zoomSel.value)}; localStorage.setItem(LS_KEY, JSON.stringify(s)); }
+    const sprites={ groundTile:makeGroundTile(), fruits:makeFruitSprites(), coin:makeCoin() };
+    function makeGroundTile(){ const s=24, off=document.createElement('canvas'); off.width=off.height=s; const g=off.getContext('2d'); g.fillStyle='#0f1430'; g.fillRect(0,0,s,s); g.strokeStyle='rgba(255,255,255,0.05)'; g.lineWidth=1; g.beginPath(); g.moveTo(-s,s/2); g.lineTo(s*2,s/2); g.stroke(); g.beginPath(); g.moveTo(0,0); g.lineTo(s,s); g.stroke(); g.beginPath(); g.moveTo(0,s); g.lineTo(s,0); g.stroke(); return off; }
+    function makeFruitSprites(){ const types=['apple','banana','cherry','pear']; const map={}; types.forEach(t=> map[t]=drawFruit(t)); return map; function drawFruit(type){ const s=22, off=document.createElement('canvas'); off.width=off.height=s; const g=off.getContext('2d'); if(type==='apple'){ g.fillStyle='#ff3b3b'; g.beginPath(); g.arc(s/2, s/2+1, 8, 0, Math.PI*2); g.fill(); g.fillStyle='rgba(255,255,255,.3)'; g.beginPath(); g.arc(s/2-3, s/2-1, 3, 0, Math.PI*2); g.fill(); g.fillStyle='#6d4c41'; g.fillRect(s/2-1, s/2-10, 2, 5); g.fillStyle='#20e3b2'; g.beginPath(); g.ellipse(s/2+5, s/2-6, 5, 3, -0.6, 0, Math.PI*2); g.fill(); } else if(type==='banana'){ g.strokeStyle='#ffd84d'; g.lineWidth=5; g.beginPath(); g.arc(s/2, s/2+3, 9, 0.2, 2.7); g.stroke(); g.strokeStyle='#e6c43f'; g.lineWidth=2; g.beginPath(); g.arc(s/2, s/2+3, 9, 0.5, 2.4); g.stroke(); } else if(type==='cherry'){ g.fillStyle='#ff4d6d'; g.beginPath(); g.arc(s/2-4, s/2+2, 6, 0, Math.PI*2); g.fill(); g.beginPath(); g.arc(s/2+4, s/2+2, 6, 0, Math.PI*2); g.fill(); g.strokeStyle='#6d4c41'; g.lineWidth=2; g.beginPath(); g.moveTo(s/2-4, s/2-5); g.bezierCurveTo(s/2, s/2-12, s/2, s/2-12, s/2+4, s/2-5); g.stroke(); g.fillStyle='#20e3b2'; g.beginPath(); g.ellipse(s/2, s/2-9, 5, 3, 0, 0, Math.PI*2); g.fill(); } else { g.fillStyle='#7ed957'; g.beginPath(); g.moveTo(s/2, s/2-6); g.bezierCurveTo(s/2+9, s/2-10, s/2+9, s/2+8, s/2, s/2+8); g.bezierCurveTo(s/2-9, s/2+8, s/2-9, s/2-10, s/2, s/2-6); g.fill(); g.fillStyle='#20e3b2'; g.beginPath(); g.ellipse(s/2+4, s/2-8, 5, 3, 0.4, 0, Math.PI*2); g.fill(); g.fillStyle='#6d4c41'; g.fillRect(s/2-1, s/2-12, 2, 5);} return off; } }
+    function makeCoin(){ const s=22, off=document.createElement('canvas'); off.width=off.height=s; const g=off.getContext('2d'); const grd=g.createRadialGradient(s/2,s/2,3, s/2,s/2,10); grd.addColorStop(0,'#fff3c2'); grd.addColorStop(1,'#ff9f1a'); g.fillStyle=grd; g.beginPath(); g.arc(s/2,s/2,9,0,Math.PI*2); g.fill(); g.strokeStyle='#c97f0a'; g.lineWidth=2; g.stroke(); return off; }
+    function worldToScreen(x,y){ const me=players[myId]; const vx=me?me.x:0, vy=me?me.y:0; const sx=Math.floor(cvs.width/2/CELL), sy=Math.floor(cvs.height/2/CELL); const dx=((x-vx+WORLD.w*1.5)%WORLD.w)-WORLD.w/2; const dy=((y-vy+WORLD.h*1.5)%WORLD.h)-WORLD.h/2; return {px:(sx+dx)*CELL, py:(sy+dy)*CELL}; }
+    function drawGround(){ if(!ctx) return; const cols=Math.ceil(cvs.width/CELL)+2, rows=Math.ceil(cvs.height/CELL)+2; const me=players[myId]||{x:0,y:0}; const startX=Math.floor(me.x-cols/2), startY=Math.floor(me.y-rows/2); for(let r=0;r<rows;r++){ for(let c=0;c<cols;c++){ const wx=(startX+c+WORLD.w)%WORLD.w, wy=(startY+r+WORLD.h)%WORLD.h; const {px,py}=worldToScreen(wx,wy); const t=sprites.groundTile; ctx.drawImage(t, Math.round(px), Math.round(py), CELL, CELL); const rnd=hash32(wx,wy); if(rnd>0.92){ ctx.fillStyle='rgba(255,255,255,.06)'; ctx.fillRect(Math.round(px+8), Math.round(py+10), 4, 4);} else if(rnd<0.06){ ctx.fillStyle='rgba(32,227,178,.12)'; ctx.fillRect(Math.round(px+5), Math.round(py+6), 3, 6);} } } }
+    function fruitTypeFromId(id){ let h=0; for(let i=0;i<id.length;i++){ h=(h*31+id.charCodeAt(i))>>>0;} const types=Object.keys(sprites.fruits); return types[h%types.length]; }
+    function drawFruit(x,y,id){ if(!ctx) return; const spr=sprites.fruits[fruitTypeFromId(id||'apple')]||sprites.fruits.apple; const {px,py}=worldToScreen(x,y); ctx.drawImage(spr, Math.round(px+1), Math.round(py+1), CELL-2, CELL-2); }
+    function drawDrop(x,y,value){ if(!ctx) return; const {px,py}=worldToScreen(x,y); ctx.drawImage(sprites.coin, Math.round(px+1), Math.round(py+1), CELL-2, CELL-2); ctx.fillStyle='#fff'; ctx.font='10px system-ui,Arial'; ctx.fillText(String(value), Math.round(px)+6, Math.round(py)+CELL-4); }
+    function drawSnake(p){ if(!ctx) return; p.body.forEach((seg,i)=>{ const {px,py}=worldToScreen(seg.x,seg.y); ctx.fillStyle=i===0?'#ffffff':p.color; ctx.fillRect(Math.round(px),Math.round(py),CELL-1,CELL-1); }); const head=p.body[0]; if(head){ const {px,py}=worldToScreen(head.x,head.y); const label=p.name||''; const w=ctx.measureText(label).width+8; ctx.fillStyle='rgba(0,0,0,.35)'; ctx.fillRect(Math.round(px)-2, Math.round(py)-16, w, 12); ctx.fillStyle='#fff'; ctx.font='12px system-ui,Arial'; ctx.fillText(label, Math.round(px)+2, Math.round(py)-6); } }
+    function render(){ if(!ctx||!mtx) return; ctx.fillStyle='#0f0f17'; ctx.fillRect(0,0,cvs.width,cvs.height); drawGround(); apples.forEach(a=> drawFruit(a.x,a.y,a.id)); drops.forEach(d=> drawDrop(d.x,d.y,d.value)); Object.values(players).forEach(drawSnake); drawMini(); }
+    function drawMini(){ if(!mtx) return; const mW=mini.width, mH=mini.height; mtx.clearRect(0,0,mW,mH); const sx=mW/WORLD.w, sy=mH/WORLD.h; mtx.globalAlpha=.18; mtx.fillStyle='#7f8cff'; for(let y=0;y<WORLD.h;y+=4){ for(let x=0;x<WORLD.w;x+=4){ if(hash32(x,y)>0.75) mtx.fillRect(Math.floor(x*sx),Math.floor(y*sy),Math.ceil(2*sx),Math.ceil(2*sy)); }} mtx.globalAlpha=1; mtx.fillStyle='#ffcc00'; apples.forEach(a=> mtx.fillRect(a.x*sx,a.y*sy, Math.max(1,sx), Math.max(1,sy))); mtx.fillStyle='#ff9f1a'; drops.forEach(d=> mtx.fillRect(d.x*sx,d.y*sy, Math.max(1,sx), Math.max(1,sy))); Object.entries(players).forEach(([id,p])=>{ mtx.fillStyle=id===myId?'#ffffff':'#7c5cff'; mtx.fillRect(p.x*sx,p.y*sy, Math.max(1,sx+0.5), Math.max(1,sy+0.5)); }); }
+    function loop(){ requestAnimationFrame(loop); render(); } requestAnimationFrame(loop);
+    let lastDir={x:1,y:0}, lastSend=0;
+    function sendDir(nx,ny){ if(!connected) return; const now=performance.now(); if(now-lastSend<40) return; if(lastDir&&nx===-lastDir.x&&ny===-lastDir.y) return; lastDir={x:nx,y:ny}; lastSend=now; ws.send(JSON.stringify({type:'dir', x:nx, y:ny})); }
+    addEventListener('keydown',(e)=>{ const k=e.key.toLowerCase(); if(k==='escape'){ togglePause(); return; } if(['arrowup','w'].includes(k)) sendDir(0,-1); else if(['arrowdown','s'].includes(k)) sendDir(0,1); else if(['arrowleft','a'].includes(k)) sendDir(-1,0); else if(['arrowright','d'].includes(k)) sendDir(1,0); if(k==='m') miniWrap.classList.toggle('hide'); if(k==='l') leaderWrap.classList.toggle('hide'); if(k==='c') chatWrap.classList.toggle('hide'); });
+    if(dpad){ dpad.querySelectorAll('button[data-dir]').forEach(b=> b.addEventListener('click',()=>{ const d=b.dataset.dir; if(d==='up')sendDir(0,-1); if(d==='down')sendDir(0,1); if(d==='left')sendDir(-1,0); if(d==='right')sendDir(1,0); })); }
+    function connect(){ const url=wsUrlEl.value.trim(); ws=new WebSocket(url); const room=(roomEl.value||'public').trim().slice(0,24); roomLabel.textContent=room; ws.onopen=()=>{ connected=true; btnStart.disabled=false; ws.send(JSON.stringify({type:'hello', name:sanitizeName(nameEl.value)||`Player-${Math.floor(Math.random()*1000)}`, room})); ping(); }; ws.onclose=()=>{ connected=false; btnStart.disabled=true; showSetup(); }; ws.onerror=()=>{}; ws.onmessage=(ev)=>{ const data=JSON.parse(ev.data); if(data.type==='init'){ myId=data.id; WORLD=data.world; apples=data.apples; players=data.players; leaderboard=data.leader||[]; lastServerTick=data.tick||0; drops=data.drops||[]; updateHUD(); resizeToViewport(); renderLeader(); } else if(data.type==='state'){ apples=data.apples; players=data.players; leaderboard=data.leader||[]; drops=data.drops||[]; lastServerTick=data.tick||0; updateHUD(); renderLeader(); } else if(data.type==='chat'){ pushChat(data.text); } else if(data.type==='msg'){ pushChat(data.text); } else if(data.type==='pong'){ pingEl.textContent=Math.round(performance.now()-data.t); } }; }
+    function sanitizeName(n){ return String(n||'').replace(/[^\p{L}\p{N}_\- ]/gu,'').trim().slice(0,18); }
+    function updateHUD(){ pcountEl.textContent=Object.keys(players).length; const me=players[myId]; scoreEl.textContent=me?me.score:0; worldEl.textContent=`${WORLD.w}x${WORLD.h}`; }
+    function renderLeader(){ leaderEl.innerHTML=''; leaderboard.slice(0,10).forEach(it=>{ const li=document.createElement('li'); li.textContent=`${it.name} — ${it.score}`; leaderEl.appendChild(li); }); }
+    function pushChat(t){ const d=document.createElement('div'); d.textContent=t; chatlog.appendChild(d); chatlog.scrollTop=chatlog.scrollHeight; }
+    function ping(){ if(!connected) return; ws.send(JSON.stringify({type:'ping', t: performance.now()})); setTimeout(ping,1000); }
+    function resizeToViewport(){ const w=innerWidth, h=innerHeight; if(cvs){ cvs.width=w; cvs.height=h; } if(mini){ mini.width=220; mini.height=220; } }
+    addEventListener('resize', resizeToViewport);
+    function showGame(){ screenSetup.style.display='none'; screenGame.style.display='block'; resizeToViewport(); }
+    function showSetup(){ screenSetup.style.display='grid'; screenGame.style.display='none'; }
+    function togglePause(){ const vis=pause.classList.contains('hide'); if(vis){ pause.classList.remove('hide'); running=false; ws?.send(JSON.stringify({type:'pause'})); } else { pause.classList.add('hide'); running=true; ws?.send(JSON.stringify({type:'resume'})); } }
+    $('resume').onclick=()=>togglePause();
+    $('backToSetup').onclick=()=>{ ws?.close(); showSetup(); };
+    $('disconnect').onclick=()=>{ ws?.close(); showSetup(); };
+    $('btnConnect').onclick=()=>{ saveSetup(); connect(); $('btnConnect').disabled=true; };
+    $('btnStart').onclick=()=>{ if(!connected) return; showGame(); running=true; ws.send(JSON.stringify({type:'start'})); };
+    zoomSel.addEventListener('change',()=>{ CELL=Number(zoomSel.value); saveSetup(); resizeToViewport(); });
+    toggleMini.onclick=()=> miniWrap.classList.toggle('hide');
+    toggleLeader.onclick=()=> leaderWrap.classList.toggle('hide');
+    toggleChat.onclick=()=> chatWrap.classList.toggle('hide');
+    loadSetup();
+    showSetup();
+  </script>
+</body>
+</html>
