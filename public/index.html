@@ -8,7 +8,7 @@
     :root{ --ink:#e8ecff; --muted:#aab3ff; --accent:#7c5cff; }
     html,body{height:100%;margin:0}
     body{background:#0b1020;color:var(--ink);font-family:system-ui,Arial}
-    #screen-setup{position:fixed;inset:0;display:grid;place-items:center;background:radial-gradient(1200px 600px at 50% -10%, #1a2045 0%, #0b1020 60%);} 
+    #screen-setup,#screen-rank{position:fixed;inset:0;display:grid;place-items:center;background:radial-gradient(1200px 600px at 50% -10%, #1a2045 0%, #0b1020 60%);}
     .setup-card{width:min(900px,92vw);padding:24px;border:1px solid #2f3568;border-radius:16px;background:rgba(18,21,52,.55);backdrop-filter: blur(6px);} 
     .setup-title{display:flex;align-items:center;gap:10px;font-size:28px;font-weight:800;margin:0 0 16px}
     .setup-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
@@ -44,19 +44,11 @@
   </style>
 </head>
 <body>
-  <section id="screen-setup" aria-label="Configuração">
+  <section id="screen-setup" aria-label="Login">
     <div class="setup-card">
       <h1 class="setup-title">🐍 Snake — PRO Multiplayer</h1>
       <div class="setup-grid">
-        <div>
-          <label>Servidor WS</label>
-          <input id="wsurl" value="ws://localhost:8080" />
-        </div>
-        <div>
-          <label>Sala (deixe em branco para automática)</label>
-          <input id="room" placeholder="automática" />
-        </div>
-        <div>
+        <div class="full">
           <label>Seu nome</label>
           <input id="playername" placeholder="Jogador" />
         </div>
@@ -72,8 +64,17 @@
         <div class="full hint">Dica: você pode reabrir esta tela a qualquer momento com <b>Esc</b>.</div>
       </div>
       <div class="setup-actions">
-        <button id="btnConnect">Conectar</button>
-        <button id="btnStart" disabled>Entrar no jogo</button>
+        <button id="btnRank">Ranking</button>
+        <button id="btnStart">Entrar no jogo</button>
+      </div>
+    </div>
+  </section>
+  <section id="screen-rank" aria-label="Ranking" style="display:none">
+    <div class="setup-card">
+      <h1 class="setup-title">🏆 Ranking</h1>
+      <ol id="rankList"></ol>
+      <div class="setup-actions">
+        <button id="backToLogin">Voltar</button>
       </div>
     </div>
   </section>
