@@ -18,8 +18,15 @@ class MiniMap {
     const mW = this.canvas.width,
       mH = this.canvas.height;
     mtx.clearRect(0, 0, mW, mH);
-    const sx = mW / world.w,
-      sy = mH / world.h;
+
+    // Avoid zooming in when the world is smaller than the minimap by
+    // clamping the scale to 1. This keeps objects visually smaller.
+    const sx = Math.min(mW / world.w, 1),
+      sy = Math.min(mH / world.h, 1);
+
+    // Center the world inside the minimap when there is extra space.
+    const ox = (mW - world.w * sx) / 2,
+      oy = (mH - world.h * sy) / 2;
 
     mtx.globalAlpha = 0.18;
     mtx.fillStyle = '#7f8cff';
@@ -27,10 +34,10 @@ class MiniMap {
       for (let x = 0; x < world.w; x += 4) {
         if (hash32(x, y) > 0.75)
           mtx.fillRect(
-            Math.floor(x * sx),
-            Math.floor(y * sy),
-            Math.ceil(2 * sx),
-            Math.ceil(2 * sy)
+            Math.floor(x * sx + ox),
+            Math.floor(y * sy + oy),
+            Math.max(1, Math.ceil(2 * sx)),
+            Math.max(1, Math.ceil(2 * sy))
           );
       }
     }
@@ -38,19 +45,29 @@ class MiniMap {
 
     mtx.fillStyle = '#ffcc00';
     apples.forEach((a) =>
-      mtx.fillRect(a.x * sx, a.y * sy, Math.max(1, sx), Math.max(1, sy))
+      mtx.fillRect(
+        a.x * sx + ox,
+        a.y * sy + oy,
+        Math.max(1, sx),
+        Math.max(1, sy)
+      )
     );
     mtx.fillStyle = '#ff9f1a';
     drops.forEach((d) =>
-      mtx.fillRect(d.x * sx, d.y * sy, Math.max(1, sx), Math.max(1, sy))
+      mtx.fillRect(
+        d.x * sx + ox,
+        d.y * sy + oy,
+        Math.max(1, sx),
+        Math.max(1, sy)
+      )
     );
     Object.entries(players).forEach(([id, p]) => {
       mtx.fillStyle = id === myId ? '#ffffff' : '#7c5cff';
       mtx.fillRect(
-        p.x * sx,
-        p.y * sy,
-        Math.max(1, sx + 0.5),
-        Math.max(1, sy + 0.5)
+        p.x * sx + ox,
+        p.y * sy + oy,
+        Math.max(1, sx),
+        Math.max(1, sy)
       );
     });
   }
