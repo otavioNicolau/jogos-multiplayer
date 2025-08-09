@@ -10,13 +10,25 @@ class MiniMap {
   constructor(canvas) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
+    this.dpr = 1;
+  }
+
+  resize(dpr = window.devicePixelRatio || 1) {
+    this.dpr = dpr;
+    const size = 220;
+    this.canvas.width = Math.floor(size * dpr);
+    this.canvas.height = Math.floor(size * dpr);
+    this.canvas.style.width = size + 'px';
+    this.canvas.style.height = size + 'px';
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.ctx.imageSmoothingEnabled = false;
   }
 
   render(world, players, apples, drops, myId) {
     const mtx = this.ctx;
     if (!mtx) return;
-    const mW = this.canvas.width,
-      mH = this.canvas.height;
+    const mW = this.canvas.width / this.dpr,
+      mH = this.canvas.height / this.dpr;
     mtx.clearRect(0, 0, mW, mH);
 
     // Avoid zooming in when the world is smaller than the minimap by
