@@ -2,6 +2,9 @@
 // deps: npm i ws nanoid
 const { WebSocketServer } = require('ws');
 const { nanoid } = require('nanoid');
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 8080;
 const TICK_MS = 110;
@@ -9,8 +12,25 @@ const WORLD = { w: 80, h: 60 };
 const BASE_APPLES = 4;
 const MAX_NAME = 18;
 
-const wss = new WebSocketServer({ port: PORT });
-console.log(`WS server on ws://localhost:${PORT}`);
+const server = http.createServer((req, res) => {
+  const urlPath = req.url === '/' ? '/index.html' : req.url;
+  const safePath = path.normalize(urlPath).replace(/^(\.\.[\/\\])+/, '');
+  const filePath = path.join(__dirname, 'public', safePath);
+  fs.readFile(filePath, (err, data) => {
+    if (err) {
+      res.writeHead(404);
+      res.end('Not found');
+      return;
+    }
+    const ext = path.extname(filePath).toLowerCase();
+    const type = ext === '.js' ? 'text/javascript' : 'text/html';
+    res.writeHead(200, { 'Content-Type': type });
+    res.end(data);
+  });
+});
+
+const wss = new WebSocketServer({ server });
+server.listen(PORT, () => console.log(`HTTP/WebSocket server on http://localhost:${PORT}`));
 
 // rooms[roomId] = { tick, players: Map, apples: [], drops: [], world }
 const rooms = new Map();
