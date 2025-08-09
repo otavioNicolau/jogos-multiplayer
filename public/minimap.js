@@ -1,3 +1,11 @@
+function hash32(x, y) {
+  let h = (x * 374761393 + y * 668265263) | 0;
+  h ^= h << 13;
+  h ^= h >>> 17;
+  h ^= h << 5;
+  return (h >>> 0) / 4294967296;
+}
+
 class MiniMap {
   constructor(canvas) {
     this.canvas = canvas;
