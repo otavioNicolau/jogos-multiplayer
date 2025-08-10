@@ -24,3 +24,5 @@ PORT=3000 npm start
 ## Novidades
 - Mapa expandido para 160x120 células.
 - Sistema de salas automático que agrupa até 50 jogadores por sala. Deixe o campo **Sala** vazio para entrar automaticamente.
+- Sistema de níveis que envia mensagens de progresso ao subir de nível.
+- Terreno com elementos decorativos como árvores e pedras para um visual mais rico.
