@@ -7,26 +7,27 @@
     const cvs=$('c'), ctx=cvs?cvs.getContext('2d'):null;
     const miniCanvas=$('mini');
     const miniMap=miniCanvas?new MiniMap(miniCanvas):null;
-    const scoreEl=$('score'), pcountEl=$('pcount'), pingEl=$('ping'), worldEl=$('world'), roomLabel=$('roomLabel');
+    const scoreEl=$('score'), levelEl=$('level'), pcountEl=$('pcount'), pingEl=$('ping'), worldEl=$('world'), roomLabel=$('roomLabel');
     const leaderEl=$('leader'), chatlog=$('chatlog'), chatInput=$('chatmsg');
     const pause=$('pause'), resumeBtn=$('resume'), backBtn=$('backToSetup');
     const toggleMini=$('toggleMini'), toggleLeader=$('toggleLeader'), toggleChat=$('toggleChat');
     const miniWrap=$('miniWrap'), leaderWrap=$('leaderWrap'), chatWrap=$('chatWrap');
     const dpad=$('dpad');
     let ws, connected=false, running=false, myId=null; let CELL=Number(zoomSel.value);
-    let WORLD={w:160,h:120}; let players={}, apples=[], leaderboard=[], drops=[]; let lastServerTick=0;
+    let WORLD={w:160,h:120}; let players={}, apples=[], leaderboard=[], drops=[]; let lastServerTick=0; let currentLevel=1;
     let DPR=window.devicePixelRatio||1;
     const LS_KEY='snake_pro_setup';
     function loadSetup(){ try{ const s=JSON.parse(localStorage.getItem(LS_KEY)||'{}'); if(s.name) nameEl.value=s.name; if(s.zoom){ zoomSel.value=String(s.zoom); CELL=Number(s.zoom);} }catch{} }
     function saveSetup(){ const s={ name:nameEl.value, zoom:Number(zoomSel.value)}; localStorage.setItem(LS_KEY, JSON.stringify(s)); }
-    const sprites={ tiles:makeTiles(), tree:makeTree(), fruits:makeFruitSprites(), coin:makeCoin() };
+    const sprites={ tiles:makeTiles(), tree:makeTree(), rock:makeRock(), fruits:makeFruitSprites(), coin:makeCoin() };
     function makeTiles(){ const s=24, grass=document.createElement('canvas'); grass.width=grass.height=s; const gg=grass.getContext('2d'); gg.fillStyle='#3a7328'; gg.fillRect(0,0,s,s); for(let i=0;i<40;i++){ gg.fillStyle=`rgba(0,0,0,${Math.random()*0.15})`; gg.fillRect(Math.random()*s,Math.random()*s,1,1);} const road=document.createElement('canvas'); road.width=road.height=s; const rg=road.getContext('2d'); rg.fillStyle='#8b5a2b'; rg.fillRect(0,0,s,s); for(let i=0;i<40;i++){ rg.fillStyle=`rgba(0,0,0,${Math.random()*0.15})`; rg.fillRect(Math.random()*s,Math.random()*s,1,1);} return {grass, road}; }
     function makeTree(){ const s=24, off=document.createElement('canvas'); off.width=off.height=s; const g=off.getContext('2d'); g.fillStyle='#5d3a1a'; g.fillRect(s/2-2,s-8,4,8); g.fillStyle='#2e8b57'; g.beginPath(); g.arc(s/2,s-10,10,0,Math.PI*2); g.fill(); return off; }
+    function makeRock(){ const s=24, off=document.createElement('canvas'); off.width=off.height=s; const g=off.getContext('2d'); g.fillStyle='#555'; g.beginPath(); g.moveTo(4,s-4); g.lineTo(s-6,s-6); g.lineTo(s-8,8); g.lineTo(8,4); g.closePath(); g.fill(); g.strokeStyle='#444'; g.lineWidth=2; g.stroke(); return off; }
     function makeFruitSprites(){ const types=['apple','banana','cherry','pear']; const map={}; types.forEach(t=> map[t]=drawFruit(t)); return map; function drawFruit(type){ const s=22, off=document.createElement('canvas'); off.width=off.height=s; const g=off.getContext('2d'); if(type==='apple'){ g.fillStyle='#ff3b3b'; g.beginPath(); g.arc(s/2, s/2+1, 8, 0, Math.PI*2); g.fill(); g.fillStyle='rgba(255,255,255,.3)'; g.beginPath(); g.arc(s/2-3, s/2-1, 3, 0, Math.PI*2); g.fill(); g.fillStyle='#6d4c41'; g.fillRect(s/2-1, s/2-10, 2, 5); g.fillStyle='#20e3b2'; g.beginPath(); g.ellipse(s/2+5, s/2-6, 5, 3, -0.6, 0, Math.PI*2); g.fill(); } else if(type==='banana'){ g.strokeStyle='#ffd84d'; g.lineWidth=5; g.beginPath(); g.arc(s/2, s/2+3, 9, 0.2, 2.7); g.stroke(); g.strokeStyle='#e6c43f'; g.lineWidth=2; g.beginPath(); g.arc(s/2, s/2+3, 9, 0.5, 2.4); g.stroke(); } else if(type==='cherry'){ g.fillStyle='#ff4d6d'; g.beginPath(); g.arc(s/2-4, s/2+2, 6, 0, Math.PI*2); g.fill(); g.beginPath(); g.arc(s/2+4, s/2+2, 6, 0, Math.PI*2); g.fill(); g.strokeStyle='#6d4c41'; g.lineWidth=2; g.beginPath(); g.moveTo(s/2-4, s/2-5); g.bezierCurveTo(s/2, s/2-12, s/2, s/2-12, s/2+4, s/2-5); g.stroke(); g.fillStyle='#20e3b2'; g.beginPath(); g.ellipse(s/2, s/2-9, 5, 3, 0, 0, Math.PI*2); g.fill(); } else { g.fillStyle='#7ed957'; g.beginPath(); g.moveTo(s/2, s/2-6); g.bezierCurveTo(s/2+9, s/2-10, s/2+9, s/2+8, s/2, s/2+8); g.bezierCurveTo(s/2-9, s/2+8, s/2-9, s/2-10, s/2, s/2-6); g.fill(); g.fillStyle='#20e3b2'; g.beginPath(); g.ellipse(s/2+4, s/2-8, 5, 3, 0.4, 0, Math.PI*2); g.fill(); g.fillStyle='#6d4c41'; g.fillRect(s/2-1, s/2-12, 2, 5);} return off; } }
     function makeCoin(){ const s=22, off=document.createElement('canvas'); off.width=off.height=s; const g=off.getContext('2d'); const grd=g.createRadialGradient(s/2,s/2,3, s/2,s/2,10); grd.addColorStop(0,'#fff3c2'); grd.addColorStop(1,'#ff9f1a'); g.fillStyle=grd; g.beginPath(); g.arc(s/2,s/2,9,0,Math.PI*2); g.fill(); g.strokeStyle='#c97f0a'; g.lineWidth=2; g.stroke(); return off; }
     function shade(hex,pct){ const num=parseInt(hex.slice(1),16); const r=num>>16,g=(num>>8)&0xff,b=num&0xff; const t=pct<0?0:255; const p=Math.abs(pct); const R=Math.round((t-r)*p)+r; const G=Math.round((t-g)*p)+g; const B=Math.round((t-b)*p)+b; return `rgb(${R},${G},${B})`; }
     function worldToScreen(x,y){ const me=players[myId]; const vx=me?me.x:0, vy=me?me.y:0; const sx=Math.floor(cvs.width/DPR/2/CELL), sy=Math.floor(cvs.height/DPR/2/CELL); const dx=((x-vx+WORLD.w*1.5)%WORLD.w)-WORLD.w/2; const dy=((y-vy+WORLD.h*1.5)%WORLD.h)-WORLD.h/2; return {px:(sx+dx)*CELL, py:(sy+dy)*CELL}; }
-    function drawGround(){ if(!ctx) return; const cols=Math.ceil(cvs.width/CELL)+2, rows=Math.ceil(cvs.height/CELL)+2; const me=players[myId]||{x:0,y:0}; const startX=Math.floor(me.x-cols/2), startY=Math.floor(me.y-rows/2); for(let r=0;r<rows;r++){ for(let c=0;c<cols;c++){ const wx=(startX+c+WORLD.w)%WORLD.w, wy=(startY+r+WORLD.h)%WORLD.h; const {px,py}=worldToScreen(wx,wy); const road=(wx%16<2)||(wy%16<2); const t=road?sprites.tiles.road:sprites.tiles.grass; ctx.drawImage(t, Math.round(px), Math.round(py), CELL, CELL); if(!road){ const rnd=hash32(wx,wy); if(rnd>0.97) ctx.drawImage(sprites.tree, Math.round(px), Math.round(py)-CELL/2, CELL, CELL); } } } }
+    function drawGround(){ if(!ctx) return; const cols=Math.ceil(cvs.width/CELL)+2, rows=Math.ceil(cvs.height/CELL)+2; const me=players[myId]||{x:0,y:0}; const startX=Math.floor(me.x-cols/2), startY=Math.floor(me.y-rows/2); for(let r=0;r<rows;r++){ for(let c=0;c<cols;c++){ const wx=(startX+c+WORLD.w)%WORLD.w, wy=(startY+r+WORLD.h)%WORLD.h; const {px,py}=worldToScreen(wx,wy); const road=(wx%16<2)||(wy%16<2); const t=road?sprites.tiles.road:sprites.tiles.grass; ctx.drawImage(t, Math.round(px), Math.round(py), CELL, CELL); if(!road){ const rnd=hash32(wx,wy); if(rnd>0.98) ctx.drawImage(sprites.tree, Math.round(px), Math.round(py)-CELL/2, CELL, CELL); else if(rnd>0.96) ctx.drawImage(sprites.rock, Math.round(px), Math.round(py), CELL, CELL); } } } }
     function fruitTypeFromId(id){ let h=0; for(let i=0;i<id.length;i++){ h=(h*31+id.charCodeAt(i))>>>0;} const types=Object.keys(sprites.fruits); return types[h%types.length]; }
     function drawFruit(x,y,id){ if(!ctx) return; const spr=sprites.fruits[fruitTypeFromId(id||'apple')]||sprites.fruits.apple; const {px,py}=worldToScreen(x,y); ctx.drawImage(spr, Math.round(px+1), Math.round(py+1), CELL-2, CELL-2); }
     function drawDrop(x,y,value){ if(!ctx) return; const {px,py}=worldToScreen(x,y); ctx.drawImage(sprites.coin, Math.round(px+1), Math.round(py+1), CELL-2, CELL-2); ctx.fillStyle='#fff'; ctx.font='10px system-ui,Arial'; ctx.fillText(String(value), Math.round(px)+6, Math.round(py)+CELL-4); }
@@ -57,6 +58,7 @@
         if(data.type==='init'){
           myId=data.id; WORLD=data.world; apples=data.apples; players=data.players; leaderboard=data.leader||[]; lastServerTick=data.tick||0; drops=data.drops||[];
           roomLabel.textContent=data.room||'auto';
+          currentLevel=1;
           updateHUD(); resizeToViewport(); renderLeader();
           showGame(); running=true; ws.send(JSON.stringify({type:'start'}));
         } else if(data.type==='state'){
@@ -71,7 +73,19 @@
       };
     }
     function sanitizeName(n){ return String(n||'').replace(/[^\p{L}\p{N}_\- ]/gu,'').trim().slice(0,18); }
-    function updateHUD(){ pcountEl.textContent=Object.keys(players).length; const me=players[myId]; scoreEl.textContent=me?me.score:0; worldEl.textContent=`${WORLD.w}x${WORLD.h}`; }
+    function updateHUD(){
+      pcountEl.textContent=Object.keys(players).length;
+      const me=players[myId];
+      const score=me?me.score:0;
+      scoreEl.textContent=score;
+      worldEl.textContent=`${WORLD.w}x${WORLD.h}`;
+      const lvl=Math.floor(score/50)+1;
+      levelEl.textContent=lvl;
+      if(lvl!==currentLevel){
+        pushChat(`🎉 Nível ${lvl} alcançado!`);
+        currentLevel=lvl;
+      }
+    }
     function renderLeader(){ leaderEl.innerHTML=''; leaderboard.slice(0,10).forEach(it=>{ const li=document.createElement('li'); li.textContent=`${it.name} — ${it.score}`; leaderEl.appendChild(li); }); }
     function fetchRank(){
       fetch('/rank').then(r=>r.json()).then(list=>{
